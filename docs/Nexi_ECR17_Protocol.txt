@@ -1,0 +1,291 @@
+================================================================================
+MANUALE PROTOCOLLO POS TRADIZIONALE NEXI - DETTAGLIO COMPLETO COMANDI API
+================================================================================
+Il protocollo di comunicazione prevede che la comunicazione sia sempre avviata dalla cassa (ECR). 
+I messaggi sono in formato testo in chiaro e includono un byte di controllo LRC (calcolato tramite OR esclusivo su tutti i byte con base 0x7F).
+
+Formato base del pacchetto applicativo:
+Pos | Nome campo      | Valore | Tipo   | Lunghezza (byte)
+1   | Start of text   | 0x02   | Binario| 1
+2..N| App message     | -      | Binario| N
+N+1 | End of Text     | 0x03   | Binario| 1
+N+2 | LRC             | -      | Binario| 1
+
+--------------------------------------------------------------------------------
+1. STATO TERMINALE (Terminal Status)
+--------------------------------------------------------------------------------
+Questo comando garantisce e verifica la connessione tra ECR e EFT-POS.
+
+Richiesta (da ECR):
+Pos | Lungh | Tipo | Contenuto
+1   | 8     | N    | Terminal ID (00000000-99999999)
+9   | 1     | A    | Riservato – fisso a '0' (0x30)
+10  | 1     | A    | Codice messaggio: 's' (0x73)
+
+Risposta (da POS):
+Pos | Lungh | Tipo | Contenuto
+1   | 8     | N    | Terminal ID (00000000-99999999)
+9   | 1     | A    | Riservato – fisso a '0' (0x30)
+10  | 1     | N    | Codice messaggio: 's' (0x73)
+11  | 10    | N    | Riservato – fisso a '0' (0x30)
+21  | 10    | N    | Data e ora del terminale nel formato "DDMMYYhhmm"
+31  | 1     | N    | Stato del terminale: '0' = Non configurato; '1' = Configurato, no DLL; '2' = Operativo; '3' = Non allineato; '4' = Chiave corrotta; '5' = DLL in attesa; '6' = Richiesta aggiornamento SW in attesa.
+32  | N*8   | AN   | Release SW del Terminale.
+
+--------------------------------------------------------------------------------
+2. PAGAMENTO BASE (Payment)
+--------------------------------------------------------------------------------
+L'ECR richiede un pagamento inviando l'importo da transare.
+
+Richiesta (da ECR):
+Pos | Lungh | Tipo | Contenuto
+1   | 8     | N    | Terminal ID (00000000-99999999)
+9   | 1     | A    | Riservato – fisso a '0' (0x30)
+10  | 1     | A    | Codice messaggio: 'P' (0x50)
+11  | 8     | N    | Cash register ID (ID Cassa)
+19  | 1     | N    | Presenza messaggio con dati aggiuntivi GT: '0'=no, '1'=sì
+20  | 2     | N    | Riservato – fisso a '0' (0x30)
+22  | 1     | N    | Partenza transazione: '0'=carta non inserita, '1'=carta già inserita
+23  | 1     | N    | Tipo pagamento: '0'=automatico, '1'=solo debito, '2'=solo credito, '3'=altre carte
+24  | 8     | N    | Importo transazione, allineato a destra, fillato con '0'. Espresso in centesimi (es. 650 = 6,50)
+32  | 128   | AN   | Testo da stampare (Codice contratto) a fine scontrino. Allineato a destra con spazi (0x20).
+160 | 8     | N    | Riservato – fisso a '0' (0x30)
+
+Risposta (da POS) - Esito Positivo ("00"):
+Pos | Lungh | Tipo | Contenuto
+1   | 8     | N    | Terminal ID
+9   | 1     | A    | Riservato – fisso a '0' (0x30)
+10  | 1     | A    | Codice messaggio: 'E' (0x45)
+11  | 2     | N    | Risultato transazione: "00" = OK
+13  | 19    | N    | PAN Carta, allineato a destra con '0' a sinistra
+32  | 3     | A    | Tipo transazione: "ICC", "MAG", "MAN", "CLM", "CLI"
+35  | 6     | A    | Codice autorizzazione ricevuto dall'host
+41  | 7     | A    | Data e ora (DDDHHMM) ricevute dall'host
+48  | 1     | N    | Tipo carta: '1'=Bancomat, '2'=Credito, '3'=Altra
+49  | 11    | N    | Acquirer ID
+60  | 6     | N    | STAN (Sequence number)
+66  | 6     | N    | ID online
+
+Risposta (da POS) - Esito Negativo ("01"):
+I campi dalla pos 13 alla 47 cambiano in caso di errore:
+13  | 24    | A    | Descrizione del risultato (motivo del rifiuto in ASCII).
+37  | 11    | N    | Riservato – fisso a '0' (0x30)
+
+(Nota: Se la transazione prevede Cambio Valuta/DCC, il codice messaggio di risposta è 'V' e include campi aggiuntivi per tasso di cambio e importi in valuta estera dalla posizione 72 alla 117 ).
+
+--------------------------------------------------------------------------------
+3. PAGAMENTO CON RISULTATO ESTESO (Payment with extended result)
+--------------------------------------------------------------------------------
+Fornisce gli stessi dati del pagamento base ma restituisce un risultato più dettagliato.
+
+Richiesta (da ECR): 
+Identica al comando di Pagamento Base, ma il Codice Messaggio alla pos. 10 è: 'X' (0x58).
+
+Risposta (da POS): 
+Identica alla risposta del Pagamento Base (Codice 'E' 0x45), ma aggiunge sempre 3 campi finali:
+72  | 3     | N    | Action code relativo al pagamento corrente
+75  | 8     | N    | Importo transazione ricevuto dall'host (in centesimi)
+83  | 10    | N    | Riservato – fisso a '0' (0x30)
+
+--------------------------------------------------------------------------------
+4. STORNO (Reversal)
+--------------------------------------------------------------------------------
+Annulla l'ultima transazione effettuata (es. per importo errato).
+
+Richiesta (da ECR):
+Pos | Lungh | Tipo | Contenuto
+1   | 8     | N    | Terminal ID
+9   | 1     | A    | Riservato – fisso a '0' (0x30)
+10  | 1     | A    | Codice messaggio: 'S' (0x53)
+11  | 8     | N    | Cash register ID
+19  | 6     | N    | STAN della transazione da stornare (000000 = nessun controllo)
+25  | 1     | N    | Presenza dati aggiuntivi per GT ('0'=no, '1'=sì)
+26  | 1     | N    | Riservato – fisso a '0' (Richiede la stessa carta della transazione)
+
+Risposta (da POS):
+Utilizza il formato di risposta 'E' (0x45) standard, includendo l'Action code alla posizione 72.
+
+--------------------------------------------------------------------------------
+5. PRE-AUTORIZZAZIONE (Pre-Authorization Request)
+--------------------------------------------------------------------------------
+Blocca il plafond della carta (usato tipicamente in hotel/noleggi).
+
+Richiesta (da ECR):
+Uguale al Pagamento, ma il Codice messaggio alla posizione 10 è: 'p' (0x70) e l'importo alla posizione 24 è l'importo stimato da bloccare.
+
+Risposta (da POS) - Esito Positivo:
+Pos | Lungh | Tipo | Contenuto
+10  | 1     | A    | Codice messaggio: 'e' (0x65)
+11  | 2     | N    | Risultato: "00" = OK
+13  | 19    | N    | PAN Carta
+32  | 3     | A    | Tipo transazione (ICC, MAG, MAN, CLM, CLI)
+35  | 6     | A    | Codice autorizzazione
+41  | 8     | N    | Importo pre-autorizzato dall'Host (in centesimi)
+49  | 9     | N    | Identificatore univoco della pre-autorizzazione (Preauthorization Code)
+58  | 3     | N    | Action Code
+61  | 7     | N    | Parametri temporali (DDDHHMM)
+68  | 3     | N    | Riservato – fisso a '0' (0x30)
+(I campi dal 48 in poi mantengono le informazioni su Tipo carta, Acquirer ID e STAN come nel pagamento base, scalati in posizione ).
+
+--------------------------------------------------------------------------------
+6. AUTORIZZAZIONE INCREMENTALE (Incremental Authorization)
+--------------------------------------------------------------------------------
+Blocca un importo aggiuntivo per un servizio in corso.
+
+Richiesta (da ECR):
+Pos | Lungh | Tipo | Contenuto
+10  | 1     | A    | Codice messaggio: 'i' (0x69)
+24  | 8     | N    | Importo dell'autorizzazione (in centesimi)
+160 | 9     | N    | Identificatore univoco (Original Preathorization Code) ricevuto prima.
+
+Risposta (da POS):
+Risponde con Codice messaggio: 'i' (0x69). Include PAN, Codice Autorizzazione, STAN e Data.
+
+--------------------------------------------------------------------------------
+7. CHIUSURA PRE-AUTORIZZAZIONE (Pre-authorization closure)
+--------------------------------------------------------------------------------
+Addebita l'importo finale.
+
+Richiesta (da ECR):
+Pos | Lungh | Tipo | Contenuto
+10  | 1     | A    | Codice messaggio: 'c' (0x63)
+24  | 8     | N    | Importo finale da addebitare (in centesimi)
+160 | 9     | N    | Identificatore univoco (Original Preathorization Code).
+
+Risposta (da POS):
+Risponde con Codice messaggio: 'c' (0x63). Struttura identica alla risposta del Pagamento, aggiunge l'Action Code alla posizione 72.
+
+--------------------------------------------------------------------------------
+8. VERIFICA CARTA (Card verification)
+--------------------------------------------------------------------------------
+Valida la carta senza addebiti.
+
+Richiesta (da ECR):
+Pos | Lungh | Tipo | Contenuto
+10  | 1     | A    | Codice messaggio: 'H' (0x48)
+22  | 1     | N    | '0' = verifica carta standard
+23  | 1     | N    | Tipo pagamento (0=auto, 1=debito, 2=credito, 3=altro)
+
+Risposta (da POS):
+Identica alla risposta di Pagamento, con Codice Messaggio 'E' (0x45).
+
+--------------------------------------------------------------------------------
+9. DATI AGGIUNTIVI DA O PER HOST (Additional data / TAGs)
+--------------------------------------------------------------------------------
+Invia dati aggiuntivi, usati ad esempio per la Tokenizzazione.
+
+Richiesta (da ECR):
+Pos | Lungh | Tipo | Contenuto
+1   | 8     | N    | Terminal ID
+10  | 1     | A    | Codice messaggio: 'U' (0x55)
+11  | 6     | N    | Tipo Pagamento: "0" = Pagamento standard
+17  | 2     | N    | Numero campo ISO (Attualmente "62")
+19  | 8     | A    | Numero TAG (Attualmente 'DF8D01')
+27  | 1     | N    | Riservato a '0'
+28  | 4     | N    | Indice TAG esclusivo
+32  | 5     | N    | Riservato a '0'
+37  | 100-V | A    | Contenuto TAG. Max 100 caratteri. Termina con 01B hex.
+
+Risposta (da POS):
+Codice messaggio 'U' (0x55). Restituisce i dati richiesti da GT alla posizione 20.
+
+--------------------------------------------------------------------------------
+10. CHIUSURA SESSIONE (Close session)
+--------------------------------------------------------------------------------
+Azzera i totali e chiude il lotto contabile.
+
+Richiesta (da ECR):
+Pos | Lungh | Tipo | Contenuto
+10  | 1     | A    | Codice messaggio: 'C' (0x43)
+11  | 8     | N    | Cash register ID
+
+Risposta (da POS) - Esito Positivo:
+Pos | Lungh | Tipo | Contenuto
+10  | 1     | A    | Codice messaggio: 'C' (0x43)
+11  | 2     | N    | Risultato: "00" = OK
+13  | 16    | N    | Importo Totale EFT-POS (in centesimi)
+29  | 16    | N    | Importo Totale Host (in centesimi)
+
+--------------------------------------------------------------------------------
+11. TOTALI TERMINALE (Terminal totals)
+--------------------------------------------------------------------------------
+Recupera i totali senza chiudere la sessione.
+
+Richiesta (da ECR):
+10  | 1     | A    | Codice messaggio: 'T' (0x54)
+
+Risposta (da POS):
+Se OK ("00"), riporta l'Importo Totale EFT-POS (16 byte) alla posizione 13.
+
+--------------------------------------------------------------------------------
+12. INVIA ULTIMO RISULTATO (Send last result)
+--------------------------------------------------------------------------------
+Recupera l'esito dell'ultima transazione in caso di disconnessione o timeout.
+
+Richiesta (da ECR):
+10  | 1     | A    | Codice messaggio: 'G' (0x47)
+
+Risposta (da POS):
+Il POS risponde inviando l'esatta copia dell'ultimo messaggio di risposta salvato in memoria (es. un pacchetto 'E' o 'V').
+
+--------------------------------------------------------------------------------
+13. ABILITA/DISABILITA STAMPA SCONTRINO SU ECR (Enable/disable printing)
+--------------------------------------------------------------------------------
+Richiede al POS di inviare il testo dello scontrino alla cassa invece di stamparlo.
+
+Richiesta (da ECR):
+Pos | Lungh | Tipo | Contenuto
+10  | 1     | A    | Codice messaggio: 'E' (0x45)
+11  | 1     | N    | Flag abilitazione: '0' = Disabilita (stampa il POS), '1' = Abilita (invia lo scontrino all'ECR via comando "S")
+
+--------------------------------------------------------------------------------
+14. INVIA SCONTRINO (Send ticket)
+--------------------------------------------------------------------------------
+Invia fisicamente le righe di testo da stampare dal POS all'ECR.
+
+Messaggio (dal POS):
+Pos | Lungh | Tipo | Contenuto
+10  | 1     | A    | Codice messaggio: 'S' (0x53)
+11  | 1-200 | A    | Righe da stampare, formattate a 12, 14 o 42 caratteri.
+Caratteri speciali formattazione (Campo 11):
+0x7D = Nuova riga (CR+LF)
+0x7F = Inizio caratteri in grassetto doppia altezza
+0x1B = Fine dello scontrino (inviato nell'ultimo pacchetto 'S')
+
+--------------------------------------------------------------------------------
+15. RISTAMPA SCONTRINO (Reprint ticket)
+--------------------------------------------------------------------------------
+Richiede la copia dell'ultimo scontrino.
+
+Richiesta (da ECR):
+Pos | Lungh | Tipo | Contenuto
+10  | 1     | A    | Codice messaggio: 'R' (0x52)
+11  | 1     | N    | Flag abilita stampa su ECR: '0' = no, '1' = sì
+12  | 1     | N    | Tipo scontrino: '0' = ultimo finanziario, '1' = ultimo di servizio
+
+--------------------------------------------------------------------------------
+16. RICHIESTA VAS E APM (Metodi di Pagamento Alternativi)
+--------------------------------------------------------------------------------
+Gestisce servizi per Alipay, WeChat, BancomatPay. Usa XML come payload.
+
+Richiesta (da ECR):
+Pos | Lungh | Tipo | Contenuto
+10  | 1     | A    | Codice messaggio: "K" (0x4B)
+23  | 4     | N    | Lunghezza della richiesta XML
+27  | 1-1024| A    | Richiesta VAS in formato XML
+
+Risposta (da POS):
+Pos | Lungh | Tipo | Contenuto
+10  | 1     | A    | Codice messaggio: "K" (0x4B)
+15  | 1     | N    | Flag concatenazione: '0' = ultimo messaggio, '1' = seguono altri messaggi
+16  | 3     | N    | ID messaggio (es. "001")
+27  | 1-1024| A    | Risposta VAS in formato XML
+
+Esempi di Payload XML (dentro il campo 27):
+* Pagamento QR: `<ecrreq><p k="ECRVASID">BPAY_QR</p><p k="SUBSMPARAMS"><p k="AMOUNT">10</p><p k="PRINTER">ECR</p></p></ecrreq>`
+* Verifica esito: `<ecrreq><p k="ECRVASID">BPAY_INQUIRY</p>...`
+* Rimborso: `<ecrreq><p k="ECRVASID">BPAY_REFUND</p>...`
+* Totali Giornalieri: `<ecrreq><p k="ECRVASID">BPAY_TOTAL</p></ecrreq>`
+* Chiusura: `<ecrreq><p k="ECRVASID">BPAY_CHIUSURA</p></ecrreq>`
+
+================================================================================
