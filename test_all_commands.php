@@ -29,12 +29,15 @@ if (!defined('POS_HOST')) {
 if (!defined('POS_PORT')) {
     define('POS_PORT', (int)(getenv('POS_PORT') !== false ? getenv('POS_PORT') : 8000));
 }
+if (!defined('POS_TERMINAL_ID')) {
+    define('POS_TERMINAL_ID', getenv('POS_TERMINAL_ID') !== false ? getenv('POS_TERMINAL_ID') : '09253031');
+}
 
 $POS_HOST = POS_HOST;
 $POS_PORT = max(1, min(65535, (int)POS_PORT));
 $timeout   = isset($_REQUEST['timeout']) ? max(1, min(60, (int)$_REQUEST['timeout'])) : 10;
 
-$tidRaw = isset($_REQUEST['tid']) ? preg_replace('/[^0-9]/', '', $_REQUEST['tid']) : '09253031';
+$tidRaw = isset($_REQUEST['tid']) ? preg_replace('/[^0-9]/', '', $_REQUEST['tid']) : preg_replace('/[^0-9]/', '', POS_TERMINAL_ID);
 $terminalId = str_pad(substr($tidRaw, 0, 8), 8, '0', STR_PAD_LEFT);
 $cridRaw = isset($_REQUEST['crid']) ? preg_replace('/[^0-9]/', '', $_REQUEST['crid']) : '00000001';
 $cashRegisterId = str_pad(substr($cridRaw, 0, 8), 8, '0', STR_PAD_LEFT);
@@ -190,6 +193,26 @@ function buildAckFrame() {
     return chr(0x06) . chr(0x03) . chr((0x7F ^ 0x06 ^ 0x03) & 0xFF);
 }
 
+/** Decodifica testo scontrino (comando S): 0x7D=nuova riga, 0x7F=grassetto, 0x1B=fine */
+function renderTicketText($data) {
+    $out = '';
+    for ($i = 0; $i < strlen($data); $i++) {
+        $b = ord($data[$i]);
+        if ($b === 0x7D) {
+            $out .= "\n";
+        } elseif ($b === 0x1B) {
+            $out .= "[FINE SCONTRINO]";
+        } elseif ($b === 0x7F) {
+            $out .= "[GRASSETTO]";
+        } elseif ($b < 0x20) {
+            $out .= sprintf("[0x%02X]", $b);
+        } else {
+            $out .= $data[$i];
+        }
+    }
+    return $out;
+}
+
 function sendAndReceive($host, $port, $frame, $timeout) {
     $fp = @fsockopen($host, $port, $errno, $errstr, 10);
     if (!$fp) {
@@ -227,6 +250,83 @@ function sendAndReceive($host, $port, $frame, $timeout) {
     }
     fclose($fp);
     return ['errno' => 0, 'errstr' => '', 'response' => $response];
+}
+
+/** Invia due frame su due connessioni separate (E poi R). Alcuni POS chiudono la connessione dopo l'ACK. */
+function sendTwoCommandsAndReceive($host, $port, $frame1, $frame2, $timeout1 = 5, $timeout2 = 15) {
+    $ackFrame = buildAckFrame();
+    $allResponse = '';
+
+    // Prima connessione: comando E (abilita stampa ECR)
+    $fp = @fsockopen($host, $port, $errno, $errstr, 10);
+    if (!$fp) {
+        return ['errno' => $errno, 'errstr' => $errstr, 'response' => ''];
+    }
+    if (fwrite($fp, $frame1) !== strlen($frame1)) {
+        fclose($fp);
+        return ['errno' => 0, 'errstr' => 'Errore invio frame E', 'response' => ''];
+    }
+    stream_set_timeout($fp, $timeout1);
+    $buf = '';
+    $lastDataAt = microtime(true);
+    while ((microtime(true) - $lastDataAt) < $timeout1 && strlen($allResponse) < 8192) {
+        $ch = fread($fp, 256);
+        if ($ch === false || strlen($ch) === 0) {
+            usleep(100000);
+            continue;
+        }
+        $allResponse .= $ch;
+        $buf .= $ch;
+        $lastDataAt = microtime(true);
+        while (true) {
+            $stxPos = strpos($buf, chr(0x02));
+            if ($stxPos === false) {
+                if (strlen($buf) > 4096) $buf = substr($buf, -128);
+                break;
+            }
+            $etxPos = strpos($buf, chr(0x03), $stxPos + 1);
+            if ($etxPos === false || ($etxPos + 1) >= strlen($buf)) break;
+            @fwrite($fp, $ackFrame);
+            $buf = substr($buf, $etxPos + 2);
+        }
+    }
+    fclose($fp);
+
+    // Seconda connessione: comando R (ristampa, invio a ECR)
+    $fp2 = @fsockopen($host, $port, $errno2, $errstr2, 10);
+    if (!$fp2) {
+        return ['errno' => $errno2, 'errstr' => $errstr2, 'response' => $allResponse];
+    }
+    if (fwrite($fp2, $frame2) !== strlen($frame2)) {
+        fclose($fp2);
+        return ['errno' => 0, 'errstr' => 'Errore invio frame R', 'response' => $allResponse];
+    }
+    stream_set_timeout($fp2, $timeout2);
+    $buf2 = '';
+    $lastDataAt = microtime(true);
+    while ((microtime(true) - $lastDataAt) < $timeout2 && strlen($allResponse) < 32768) {
+        $ch = fread($fp2, 256);
+        if ($ch === false || strlen($ch) === 0) {
+            usleep(100000);
+            continue;
+        }
+        $allResponse .= $ch;
+        $buf2 .= $ch;
+        $lastDataAt = microtime(true);
+        while (true) {
+            $stxPos = strpos($buf2, chr(0x02));
+            if ($stxPos === false) {
+                if (strlen($buf2) > 4096) $buf2 = substr($buf2, -128);
+                break;
+            }
+            $etxPos = strpos($buf2, chr(0x03), $stxPos + 1);
+            if ($etxPos === false || ($etxPos + 1) >= strlen($buf2)) break;
+            @fwrite($fp2, $ackFrame);
+            $buf2 = substr($buf2, $etxPos + 2);
+        }
+    }
+    fclose($fp2);
+    return ['errno' => 0, 'errstr' => '', 'response' => $allResponse];
 }
 
 function formatHex($data, $maxBytes = 256) {
@@ -276,7 +376,8 @@ function parseAndDescribe($response, $cmdLabel) {
                     $result = substr($payloadRx, 10, 2);
                     $out .= "  Esito transazione: $result\n";
                 } elseif ($code === 'S') {
-                    $out .= "  (Righe scontrino ricevute)\n";
+                    $ticketChunk = substr($payloadRx, 10);
+                    $out .= "  --- Testo scontrino ---\n  " . str_replace("\n", "\n  ", trim(renderTicketText($ticketChunk))) . "\n";
                 } elseif ($code === 'K') {
                     $out .= "  (Risposta VAS/APM XML)\n";
                 }
@@ -351,6 +452,27 @@ if ($cmd !== '' && $isAjax) {
             $payload = buildReprint($terminalId, $printEcr, $ticketType);
             $label = 'Ristampa scontrino (R)';
             break;
+        case 'reprint_ecr':
+            // Comando combinato: prima E (abilita stampa su ECR), poi R (ristampa con invio a ECR)
+            $frameE = wrapStxEtxLrc(buildEnablePrint($terminalId, '1'));
+            $frameR = wrapStxEtxLrc(buildReprint($terminalId, '1', $ticketType));
+            $result = sendTwoCommandsAndReceive($POS_HOST, $POS_PORT, $frameE, $frameR, 5, 15);
+            $output = "=== Ristampa + stampa su ECR (E poi R) ===\n";
+            $output .= "Host: $POS_HOST : $POS_PORT | Terminal: $terminalId\n";
+            $output .= "1) Inviato E (abilita stampa ECR)\n";
+            $output .= "2) Inviato R (ristampa, invio a ECR) | Tipo scontrino: " . ($ticketType === '1' ? 'servizio' : 'finanziario') . "\n\n";
+            if ($result['errno'] !== 0 || $result['errstr'] !== '') {
+                $output .= "ERRORE: [" . $result['errno'] . "] " . $result['errstr'] . "\n";
+                echo json_encode(['ok' => false, 'output' => $output, 'rawLength' => 0], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
+            $output .= parseAndDescribe($result['response'], 'reprint_ecr');
+            if (strpos($result['response'], chr(0x02)) === false) {
+                $output .= "\nNota: nessun frame S (scontrino) ricevuto. Il POS ha accettato E e R (doppio ACK).\n";
+                $output .= "Lo scontrino può essere inviato alla stampante ECR fisica collegata al POS, non su questa connessione TCP.\n";
+            }
+            echo json_encode(['ok' => true, 'output' => $output, 'rawLength' => strlen($result['response'])], JSON_UNESCAPED_UNICODE);
+            exit;
         case 'vas':
             $payload = buildVas($terminalId, $vasXml);
             $label = 'Richiesta VAS/APM (K)';
@@ -583,6 +705,7 @@ if ($cmd !== '' && $isAjax) {
         <div class="buttons">
             <button type="button" data-cmd="enable_print">13. Abilita/Disabilita stampa ECR (E)</button>
             <button type="button" data-cmd="reprint">15. Ristampa scontrino (R)</button>
+            <button type="button" data-cmd="reprint_ecr">Ristampa + stampa su ECR (E poi R)</button>
         </div>
     </section>
 

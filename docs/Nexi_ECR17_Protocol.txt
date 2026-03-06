@@ -289,3 +289,29 @@ Esempi di Payload XML (dentro il campo 27):
 * Chiusura: `<ecrreq><p k="ECRVASID">BPAY_CHIUSURA</p></ecrreq>`
 
 ================================================================================
+FONTI – Documentazione ufficiale Nexi Traditional POS
+================================================================================
+Overview:     https://developer.nexigroup.com/traditionalpos/en-EU/docs/
+Integration: https://developer.nexigroup.com/traditionalpos/en-EU/docs/integration-options-this-section-provides-an-overview-of-lan-integration-and-other-basic-integration-options/
+LAN:         https://developer.nexigroup.com/traditionalpos/en-EU/docs/lan-integration/
+Protocol:    https://developer.nexigroup.com/traditionalpos/en-EU/docs/communication-protocol/
+
+Comandi (dettaglio per messaggio):
+  1  Stato terminale:     https://developer.nexigroup.com/traditionalpos/en-EU/docs/terminal-status-request-message-from-ecr/
+  2  Payment:            https://developer.nexigroup.com/traditionalpos/en-EU/docs/payment/
+  3  Payment extended:    https://developer.nexigroup.com/traditionalpos/en-EU/docs/payment-with-extended-result/
+  4  Reversal:            https://developer.nexigroup.com/traditionalpos/en-EU/docs/reversal/
+  5  Pre-authorization:  https://developer.nexigroup.com/traditionalpos/en-EU/docs/pre-authorization-request/
+  6  Incremental auth:    https://developer.nexigroup.com/traditionalpos/en-EU/docs/incremental-authorization-transaction/
+  7  Pre-auth closure:    https://developer.nexigroup.com/traditionalpos/en-EU/docs/pre-authorization-closure/
+  8  Card verification:   https://developer.nexigroup.com/traditionalpos/en-EU/docs/card-verification/
+  9  Additional data:     https://developer.nexigroup.com/traditionalpos/en-EU/docs/additional-data-to-or-from-host/
+ 10  Close session:       https://developer.nexigroup.com/traditionalpos/en-EU/docs/close-session/
+ 11  Terminal totals:     https://developer.nexigroup.com/traditionalpos/en-EU/docs/terminal-totals/
+ 12  Send last result:   https://developer.nexigroup.com/traditionalpos/en-EU/docs/send-last-result/
+ 13  Enable/disable ECR:  https://developer.nexigroup.com/traditionalpos/en-EU/docs/enable-and-disable-printing-receipt-on-ecr/
+ 14  Send ticket:         https://developer.nexigroup.com/traditionalpos/en-EU/docs/send-ticket/
+ 15  Reprint ticket:      https://developer.nexigroup.com/traditionalpos/en-EU/docs/reprint-ticket/
+ 16  VAS (K):             https://developer.nexigroup.com/traditionalpos/en-EU/docs/vas-request-k-command/
+
+================================================================================

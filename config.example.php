@@ -9,3 +9,5 @@
 
 define('POS_HOST', '192.168.1.206');
 define('POS_PORT', 8000);
+/** Terminal ID (8 cifre, es. 09253031) */
+define('POS_TERMINAL_ID', '09253031');
