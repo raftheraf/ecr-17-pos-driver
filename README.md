@@ -57,4 +57,4 @@ Vedi i commenti in test_file.php per tutti i parametri (`tid`, `crid`, `timeout`
 
 ## Licenza
 
-Utilizzo libero. Riferimento: [Nexi Traditional POS – Communication protocol](https://developer.nexigroup.com/traditionalpos/).
+Utilizzo libero. Riferimento: [Nexi Traditional POS – Communication protocol]([https://developer.nexigroup.com/traditionalpos/](https://developer.nexigroup.com/traditionalpos/en-EU/docs/).
