@@ -7,6 +7,14 @@ Driver PHP per il controllo di terminali POS tradizionali Nexi (protocollo ECR17
 - PHP 5.4+ (estensione sockets)
 - Terminale POS Nexi connesso in LAN (protocollo ECR17)
 
+## Dispositivo utilizzato per le prove
+
+Le prove sono state effettuate con:
+
+- **Modello:** Ingenico AXIUM DX8000  
+- **Acquirer:** Banca di Piacenza  
+- **Processor:** Worldline  
+
 ## Configurazione
 
 1. Copia `config.example.php` in `config.php`.

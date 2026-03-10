@@ -20,7 +20,7 @@ if (file_exists($configFile)) {
     require_once $configFile;
 }
 if (!defined('POS_HOST')) {
-    define('POS_HOST', getenv('POS_HOST') !== false ? getenv('POS_HOST') : '192.168.1.206');
+    define('POS_HOST', getenv('POS_HOST') !== false ? getenv('POS_HOST') : '192.168.1.15');
 }
 if (!defined('POS_PORT')) {
     define('POS_PORT', (int) (getenv('POS_PORT') !== false ? getenv('POS_PORT') : 8000));
