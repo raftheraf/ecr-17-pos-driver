@@ -6,6 +6,7 @@
  * Configurazione: copia config.example.php in config.php oppure imposta POS_HOST e POS_PORT
  * (o le variabili d'ambiente omonime).
  *
+ * 
  * Parametri GET:
  *   amount=2.55   Importo in EUR (default 1.00)
  *   tid=00000000  Terminal ID (8 cifre)
