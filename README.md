@@ -20,7 +20,7 @@ Le prove sono state effettuate con:
 1. Copia `config.example.php` in `config.php`.
 2. Modifica `POS_HOST` e `POS_PORT` con l’indirizzo IP e la porta del tuo terminale.
 
-Se `config.php` non esiste, vengono usate le variabili d’ambiente `POS_HOST` e `POS_PORT` oppure i valori predefiniti (192.168.1.206:8000).
+Se `config.php` non esiste, vengono usate le variabili d’ambiente `POS_HOST` e `POS_PORT` oppure i valori predefiniti (192.168.1.15:8000).
 
 ## File
 

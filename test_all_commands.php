@@ -4,9 +4,10 @@
  * Pagina HTML con pulsanti per ogni comando; risposta mostrata in pagina.
  *
  * Parametri GET (per richiesta comando):
- *   cmd=status|payment|payment_ext|reversal|preauth|incr_auth|preauth_close|card_verify|
- *        additional_data|close_session|totals|last_result|enable_print|reprint|vas
- *   tid=09253031   Terminal ID (8 cifre)
+ *   cmd=status|payment|payment_ext|reversal|...
+ *   host=192.168.1.15  IP del terminale (opzionale, altrimenti da config)
+ *   port=8000           Porta (opzionale, altrimenti da config)
+ *   tid=00000000   Terminal ID (8 cifre)
  *   crid=00000001  Cash Register ID (8 cifre)
  *   amount=1.00    Importo EUR (pagamento, preauth, ecc.)
  *   stan=000000    STAN per storno (6 cifre)
@@ -24,18 +25,28 @@ if (file_exists($configFile)) {
     require_once $configFile;
 }
 if (!defined('POS_HOST')) {
-    define('POS_HOST', getenv('POS_HOST') !== false ? getenv('POS_HOST') : '192.168.1.206');
+    define('POS_HOST', getenv('POS_HOST') !== false ? getenv('POS_HOST') : '192.168.1.15');
 }
 if (!defined('POS_PORT')) {
     define('POS_PORT', (int)(getenv('POS_PORT') !== false ? getenv('POS_PORT') : 8000));
 }
 if (!defined('POS_TERMINAL_ID')) {
-    define('POS_TERMINAL_ID', getenv('POS_TERMINAL_ID') !== false ? getenv('POS_TERMINAL_ID') : '09253031');
+    define('POS_TERMINAL_ID', getenv('POS_TERMINAL_ID') !== false ? getenv('POS_TERMINAL_ID') : '00000000');
 }
 
 $POS_HOST = POS_HOST;
 $POS_PORT = max(1, min(65535, (int)POS_PORT));
 $timeout   = isset($_REQUEST['timeout']) ? max(1, min(60, (int)$_REQUEST['timeout'])) : 10;
+
+if (isset($_REQUEST['host']) && trim($_REQUEST['host']) !== '') {
+    $POS_HOST = trim($_REQUEST['host']);
+}
+if (isset($_REQUEST['port']) && $_REQUEST['port'] !== '') {
+    $portReq = (int) $_REQUEST['port'];
+    if ($portReq >= 1 && $portReq <= 65535) {
+        $POS_PORT = $portReq;
+    }
+}
 
 $tidRaw = isset($_REQUEST['tid']) ? preg_replace('/[^0-9]/', '', $_REQUEST['tid']) : preg_replace('/[^0-9]/', '', POS_TERMINAL_ID);
 $terminalId = str_pad(substr($tidRaw, 0, 8), 8, '0', STR_PAD_LEFT);
@@ -636,8 +647,16 @@ if ($cmd !== '' && $isAjax) {
 
     <div class="params">
         <div>
+            <label>Host (IP terminale)</label>
+            <input type="text" id="pos_host" value="<?php echo htmlspecialchars($POS_HOST); ?>" placeholder="192.168.1.15">
+        </div>
+        <div>
+            <label>Porta</label>
+            <input type="number" id="pos_port" value="<?php echo (int)$POS_PORT; ?>" min="1" max="65535" placeholder="8000">
+        </div>
+        <div>
             <label>Terminal ID</label>
-            <input type="text" id="tid" value="<?php echo htmlspecialchars($terminalId); ?>" maxlength="8" placeholder="09253031">
+            <input type="text" id="tid" value="<?php echo htmlspecialchars($terminalId); ?>" maxlength="8" placeholder="00000000">
         </div>
         <div>
             <label>Cash Register ID</label>
@@ -729,7 +748,9 @@ if ($cmd !== '' && $isAjax) {
         var u = new URL(window.location.href);
         u.searchParams.set('ajax', '1');
         u.searchParams.set('cmd', resultEl.getAttribute('data-cmd') || '');
-        u.searchParams.set('tid', (qs('tid') && qs('tid').value) || '09253031');
+        u.searchParams.set('host', (qs('pos_host') && qs('pos_host').value.trim()) || '');
+        u.searchParams.set('port', (qs('pos_port') && qs('pos_port').value) || '');
+        u.searchParams.set('tid', (qs('tid') && qs('tid').value) || '00000000');
         u.searchParams.set('crid', (qs('crid') && qs('crid').value) || '00000001');
         u.searchParams.set('amount', (qs('amount') && qs('amount').value) || '1.00');
         u.searchParams.set('stan', (qs('stan') && qs('stan').value) || '000000');

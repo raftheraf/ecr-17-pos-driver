@@ -24,7 +24,7 @@
  * ?print=1            Reprint verso ECR (attesi frame 'S')
  * ?type=1             1=service ticket, 0=financial ticket
  * ?raw=1              Invia payload raw (senza STX/ETX/LRC)
- * ?tid=09253031       Terminal ID
+ * ?tid=00000000       Terminal ID
  * ?crid=00000001      Cash Register ID (solo pagamento)
  * ?gt=1               Terminal totals: additional data message present (flag pos 19)
  * ?timeout=15         Timeout lettura risposta (secondi)
@@ -36,7 +36,7 @@ if (file_exists($configFile)) {
     require_once $configFile;
 }
 if (!defined('POS_HOST')) {
-    define('POS_HOST', getenv('POS_HOST') !== false ? getenv('POS_HOST') : '192.168.1.206');
+    define('POS_HOST', getenv('POS_HOST') !== false ? getenv('POS_HOST') : '192.168.1.15');
 }
 if (!defined('POS_PORT')) {
     define('POS_PORT', (int) (getenv('POS_PORT') !== false ? getenv('POS_PORT') : 8000));
@@ -64,7 +64,7 @@ $amount = round(max(0.01, min(99999.99, $amountRaw)), 2);
 $amountCents = (int) round($amount * 100);
 
 // Validazione Terminal ID e Cash Register ID: solo cifre, max 8 caratteri
-$tidRaw = isset($_REQUEST['tid']) ? preg_replace('/[^0-9]/', '', $_REQUEST['tid']) : '09253031';
+$tidRaw = isset($_REQUEST['tid']) ? preg_replace('/[^0-9]/', '', $_REQUEST['tid']) : '00000000';
 $terminalId = str_pad(substr($tidRaw, 0, 8), 8, '0', STR_PAD_LEFT);
 $cridRaw = isset($_REQUEST['crid']) ? preg_replace('/[^0-9]/', '', $_REQUEST['crid']) : '00000001';
 $cashRegisterId = str_pad(substr($cridRaw, 0, 8), 8, '0', STR_PAD_LEFT);

@@ -8,7 +8,7 @@
  *
  * Parametri GET:
  *   amount=2.55   Importo in EUR (default 1.00)
- *   tid=09253031  Terminal ID (8 cifre)
+ *   tid=00000000  Terminal ID (8 cifre)
  *   crid=00000001 Cash Register ID (8 cifre)
  *   timeout=10    Timeout risposta secondi
  *   debug=1       Mostra errori PHP
@@ -48,7 +48,7 @@ $amountRaw = isset($_REQUEST['amount']) ? (float)$_REQUEST['amount'] : 1.00;
 $amount = round(max(0.01, min(99999.99, $amountRaw)), 2);
 $amountCents = (int) round($amount * 100);
 
-$tidRaw = isset($_REQUEST['tid']) ? preg_replace('/[^0-9]/', '', $_REQUEST['tid']) : '09253031';
+$tidRaw = isset($_REQUEST['tid']) ? preg_replace('/[^0-9]/', '', $_REQUEST['tid']) : '00000000';
 $terminalId = str_pad(substr($tidRaw, 0, 8), 8, '0', STR_PAD_LEFT);
 $cridRaw = isset($_REQUEST['crid']) ? preg_replace('/[^0-9]/', '', $_REQUEST['crid']) : '00000001';
 $cashRegisterId = str_pad(substr($cridRaw, 0, 8), 8, '0', STR_PAD_LEFT);
