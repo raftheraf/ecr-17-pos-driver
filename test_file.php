@@ -123,33 +123,18 @@ function buildCloseSessionRequest($terminalId, $cashRegisterId, $gtPresent) {
  * Nexi: LRC = 0x7F XOR tutti i byte da STX a ETX inclusi
  * Frame: STX(0x02) + payload + ETX(0x03) + LRC
  */
-function wrapStxEtxLrc($payload) {
-    $stx = chr(0x02);
-    $etx = chr(0x03);
-    $data = $stx . $payload . $etx;
-    $lrc = 0x7F;
-    for ($i = 0; $i < strlen($data); $i++) {
-        $lrc ^= ord($data[$i]);
-    }
-    return $data . chr($lrc);
+// Load shared utilities and logger
+require_once __DIR__ . '/pos_utils.php';
+require_once __DIR__ . '/PosLogger.php';
+
+// Initialize logger if debug mode is enabled
+$logger = new PosLogger();
+if (TEST_POS_DEBUG) {
+    $logger->info('Debug mode enabled');
 }
 
-function dumpHex($label, $data, $maxBytes) {
-    $hex = bin2hex($data);
-    $hexSpaced = trim(chunk_split($hex, 2, ' '));
-    if (strlen($data) > $maxBytes) {
-        $hexSpaced = substr($hexSpaced, 0, $maxBytes * 3) . ' ...';
-    }
-    echo $label . " (" . strlen($data) . " byte): " . $hexSpaced . "\n";
-}
-
-function calcLrcNexi($stxPayloadEtx) {
-    $lrc = 0x7F;
-    for ($i = 0; $i < strlen($stxPayloadEtx); $i++) {
-        $lrc ^= ord($stxPayloadEtx[$i]);
-    }
-    return $lrc & 0xFF;
-}
+// Load configuration (environment, config.php, optional mcp_config.json)
+loadConfig();
 
 function renderTicketText($data) {
     $out = '';

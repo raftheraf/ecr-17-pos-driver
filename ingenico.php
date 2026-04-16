@@ -54,32 +54,18 @@ $terminalId = str_pad(substr($tidRaw, 0, 8), 8, '0', STR_PAD_LEFT);
 $cridRaw = isset($_REQUEST['crid']) ? preg_replace('/[^0-9]/', '', $_REQUEST['crid']) : '00000001';
 $cashRegisterId = str_pad(substr($cridRaw, 0, 8), 8, '0', STR_PAD_LEFT);
 
-function buildPaymentRequest($terminalId, $cashRegisterId, $amountCents, $receiptText) {
-    $receiptText = (string) $receiptText;
-    $msg  = str_pad(substr($terminalId, 0, 8), 8, '0', STR_PAD_LEFT);
-    $msg .= '0P';
-    $msg .= str_pad(substr($cashRegisterId, 0, 8), 8, '0', STR_PAD_LEFT);
-    $msg .= '00000';
-    $msg .= str_pad((string)$amountCents, 8, '0', STR_PAD_LEFT);
-    $msg .= str_pad(substr($receiptText, 0, 128), 128, ' ', STR_PAD_LEFT);
-    $msg .= '00000000';
-    return $msg;
+// Load shared utilities and logger
+require_once __DIR__ . '/pos_utils.php';
+require_once __DIR__ . '/PosLogger.php';
+
+// Initialize logger if debug mode is enabled
+$logger = new PosLogger();
+if (POS_DEBUG) {
+    $logger->info('Debug mode enabled');
 }
 
-function wrapStxEtxLrc($payload) {
-    $stx = chr(0x02);
-    $etx = chr(0x03);
-    $data = $stx . $payload . $etx;
-    $lrc = 0x7F;
-    for ($i = 0; $i < strlen($data); $i++) {
-        $lrc ^= ord($data[$i]);
-    }
-    return $data . chr($lrc & 0xFF);
-}
-
-function buildAckFrame() {
-    return chr(0x06) . chr(0x03) . chr((0x7F ^ 0x06 ^ 0x03) & 0xFF);
-}
+// Load configuration (environment, config.php, optional mcp_config.json)
+loadConfig();
 
 $payload = buildPaymentRequest($terminalId, $cashRegisterId, $amountCents, '');
 $frame = wrapStxEtxLrc($payload);
