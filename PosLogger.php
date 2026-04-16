@@ -12,7 +12,10 @@ class PosLogger {
     private $logFile;
     private $maxSize;
 
-    public function __construct($logFile = __DIR__ . '/pos.log', $maxSize = 5242880) { // 5 MB
+    public function __construct($logFile = null, $maxSize = 5242880) { // 5 MB
+        if ($logFile === null) {
+            $logFile = __DIR__ . '/pos.log';
+        }
         $this->logFile = $logFile;
         $this->maxSize = $maxSize;
     }
